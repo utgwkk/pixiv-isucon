@@ -6,7 +6,7 @@ require 'rack-lineprof'
 
 module Isuconp
   class App < Sinatra::Base
-    use Rack::Lineprof, profile: 'app.rb'
+    # use Rack::Lineprof, profile: 'app.rb'
     use Rack::Session::Memcache, autofix_keys: true, secret: ENV['ISUCONP_SESSION_SECRET'] || 'sendagaya'
     use Rack::Flash
     set :public_folder, File.expand_path('../../public', __FILE__)
@@ -57,7 +57,7 @@ module Isuconp
       end
 
       def try_login(account_name, password)
-        user = db.prepare('SELECT account_name, passhash FROM users WHERE account_name = ? AND del_flg = 0').execute(account_name).first
+        user = db.prepare('SELECT id, account_name, passhash FROM users WHERE account_name = ? AND del_flg = 0').execute(account_name).first
 
         if user && calculate_passhash(user[:account_name], password) == user[:passhash]
           return user
