@@ -123,8 +123,7 @@ SQL
 
           post[:user] = {:account_name => post[:account_name], :del_flg => post[:del_flg]}
 
-          posts.push(post) if post[:user][:del_flg] == 0
-          break if posts.length >= POSTS_PER_PAGE
+          posts.push(post)
         end
 
         posts
@@ -241,7 +240,9 @@ SELECT p.id, p.body, p.created_at, p.mime, u.account_name, u.del_flg
 FROM posts p
 LEFT JOIN users u
 ON p.user_id = u.id
+WHERE u.del_flg = 0
 ORDER BY created_at DESC
+LIMIT #{POSTS_PER_PAGE}
 SQL
       )
       posts = make_posts(results)
@@ -264,7 +265,9 @@ SQL
       JOIN users u
       ON p.user_id = u.id
       WHERE user_id = ?
+      AND u.del_flg = 0
       ORDER BY p.created_at DESC
+      LIMIT #{POSTS_PER_PAGE}
 SQL
       ).execute(user[:id])
       posts = make_posts(results)
@@ -299,7 +302,9 @@ SQL
       JOIN users u
       ON p.user_id = u.id
       WHERE p.created_at <= ?
+      AND u.del_flg = 0
       ORDER BY p.created_at DESC
+      LIMIT #{POSTS_PER_PAGE}
 SQL
       ).execute(
         max_created_at.nil? ? nil : Time.iso8601(max_created_at).localtime
