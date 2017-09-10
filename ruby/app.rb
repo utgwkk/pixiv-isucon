@@ -102,11 +102,17 @@ module Isuconp
       def make_posts(results, all_comments: false)
         posts = []
         results.to_a.each do |post|
-          post[:comment_count] = db.prepare('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?').execute(
-            post[:id]
-          ).first[:count]
-
-          query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC'
+          query = <<'SQL'
+          SELECT
+            c.comment AS comment
+          , u.account_name AS account_name
+          FROM comments c
+          JOIN users u
+          ON u.id = c.user_id
+          WHERE post_id = ?
+          ORDER BY c.created_at
+          DESC 
+SQL
           unless all_comments
             query += ' LIMIT 3'
           end
@@ -114,11 +120,10 @@ module Isuconp
             post[:id]
           ).to_a
           comments.each do |comment|
-            comment[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-              comment[:user_id]
-            ).first
+            comment[:user] = {:account_name => comment[:account_name]}
           end
           post[:comments] = comments.reverse
+          post[:comment_count] = comments.size
 
           post[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
             post[:user_id]
