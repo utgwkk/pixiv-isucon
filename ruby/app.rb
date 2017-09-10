@@ -19,8 +19,7 @@ module Isuconp
       def config
         @config ||= {
           db: {
-            host: ENV['ISUCONP_DB_HOST'] || 'localhost',
-            port: ENV['ISUCONP_DB_PORT'] && ENV['ISUCONP_DB_PORT'].to_i,
+            socket: '/var/run/mysqld/mysqld.sock',
             username: ENV['ISUCONP_DB_USER'] || 'root',
             password: ENV['ISUCONP_DB_PASSWORD'],
             database: ENV['ISUCONP_DB_NAME'] || 'isuconp',
@@ -31,8 +30,7 @@ module Isuconp
       def db
         return Thread.current[:isuconp_db] if Thread.current[:isuconp_db]
         client = Mysql2::Client.new(
-          host: config[:db][:host],
-          port: config[:db][:port],
+          socket: config[:db][:socket],
           username: config[:db][:username],
           password: config[:db][:password],
           database: config[:db][:database],
