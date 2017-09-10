@@ -105,7 +105,7 @@ module Isuconp
             c.comment AS comment
           , u.account_name AS account_name
           FROM comments c
-          JOIN users u
+          LEFT JOIN users u
           ON u.id = c.user_id
           WHERE post_id = ?
           ORDER BY c.created_at
@@ -114,18 +114,14 @@ SQL
           unless all_comments
             query += ' LIMIT 3'
           end
-          comments = db.prepare(query).execute(
-            post[:id]
-          ).to_a
+          comments = db.prepare(query).execute(post[:id]).to_a
           comments.each do |comment|
             comment[:user] = {:account_name => comment[:account_name]}
           end
           post[:comments] = comments.reverse
           post[:comment_count] = comments.size
 
-          post[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-            post[:user_id]
-          ).first
+          post[:user] = {:account_name => post[:account_name], :del_flg => post[:del_flg]}
 
           posts.push(post) if post[:user][:del_flg] == 0
           break if posts.length >= POSTS_PER_PAGE
@@ -240,7 +236,14 @@ SQL
     get '/' do
       me = get_session_user()
 
-      results = db.query('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` ORDER BY `created_at` DESC')
+      results = db.query(<<SQL
+SELECT p.id, p.body, p.created_at, p.mime, u.account_name, u.del_flg
+FROM posts p
+LEFT JOIN users u
+ON p.user_id = u.id
+ORDER BY created_at DESC
+SQL
+      )
       posts = make_posts(results)
 
       erb :index, layout: :layout, locals: { posts: posts, me: me }
@@ -255,9 +258,15 @@ SQL
         return 404
       end
 
-      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC').execute(
-        user[:id]
-      )
+      results = db.prepare(<<SQL
+      SELECT p.id, p.body, p.mime, p.created_at, u.account_name, u.del_flg
+      FROM posts p
+      JOIN users u
+      ON p.user_id = u.id
+      WHERE user_id = ?
+      ORDER BY p.created_at DESC
+SQL
+      ).execute(user[:id])
       posts = make_posts(results)
 
       comment_count = db.prepare('SELECT COUNT(*) AS count FROM `comments` WHERE `user_id` = ?').execute(
@@ -284,7 +293,15 @@ SQL
 
     get '/posts' do
       max_created_at = params['max_created_at']
-      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC').execute(
+      results = db.prepare(<<SQL
+      SELECT p.id, p.body, p.mime, p.created_at, u.account_name, u.del_flg
+      FROM posts p
+      JOIN users u
+      ON p.user_id = u.id
+      WHERE p.created_at <= ?
+      ORDER BY p.created_at DESC
+SQL
+      ).execute(
         max_created_at.nil? ? nil : Time.iso8601(max_created_at).localtime
       )
       posts = make_posts(results)
@@ -293,9 +310,14 @@ SQL
     end
 
     get '/posts/:id' do
-      results = db.prepare('SELECT * FROM `posts` WHERE `id` = ?').execute(
-        params[:id]
-      )
+      results = db.prepare(<<SQL
+      SELECT p.id, p.body, p.mime, p.created_at, u.account_name, u.del_flg
+      FROM posts p
+      JOIN users u
+      ON p.user_id = u.id
+      WHERE p.id = ?
+SQL
+      ).execute(params[:id])
       posts = make_posts(results, all_comments: true)
 
       return 404 if posts.length == 0
